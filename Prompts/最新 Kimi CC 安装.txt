@@ -1,0 +1,60 @@
+# 更新软件包索引
+sudo apt update
+
+# 升级所有已安装的软件包 (包括 apt/apt-get 自身)
+sudo apt upgrade -y
+
+# 清理旧版本缓存
+sudo apt autoclean && sudo apt autoremove -y
+
+1. 开始安装之前，在终端运行 AutoDL 的学术资源加速指令 source /etc/network_turbo (unset http_proxy && unset https_proxy)
+
+2. bash -c "$(curl -fsSL https://raw.githubusercontent.com/LLM-Red-Team/kimi-cc/refs/heads/main/install.sh)"
+未找到 Claude Code，正在安装。在此过程中，可能会遇到使用 npm 安装 Claude Code 时的网络报错。例如：
+npm error code SELF_SIGNED_CERT_IN_CHAIN
+npm error errno SELF_SIGNED_CERT_IN_CHAIN
+npm error request to https://registry.npmjs.org/@anthropic-ai%2fclaude-code failed, reason: self-signed certificate in certificate chain
+npm error A complete log of this run can be found in: /root/.npm/_logs/2025-07-13T12_41_21_036Z-debug-0.log
+
+Claude Code 的 npm 官方地址：https://www.npmjs.com/package/@anthropic-ai/claude-code
+
+3. 虽然这个 Agentic Coding 叫 Kimi CC，但还是要用 npm 下载 Claude Code 那套界面，遇到报错可以先退出终端，再重新进入，然后使用
+npm install -g @anthropic-ai/claude-code --registry=https://registry.npmmirror.com 安装好 Claude Code
+
+node --version
+npm --version
+npm install -g @anthropic-ai/claude-code --registry=https://registry.npmmirror.com
+npm install -g @anthropic-ai/claude-code --registry=https://mirrors.huaweicloud.com/repository/npm/
+npm fund
+
+4. 再运行命令来安装 Kimi CC
+
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/LLM-Red-Team/kimi-cc/refs/heads/main/install.sh)"
+
+安装成功，会提示你粘贴 Moonshot API key，然后回车，最后显示如下信息：
+
+Node.js is already installed: v22.18.0
+Claude Code is already installed: 1.0.72 (Claude Code)
+Configuring Claude Code to skip onboarding...
+🔑 Please enter your Moonshot API key:
+   You can get your API key from: https://platform.moonshot.cn/console/api-keys
+   Note: The input is hidden for security. Please paste your API key directly.
+
+
+
+📝 Adding environment variables to /root/.bashrc...
+✅ Environment variables added to /root/.bashrc
+
+🎉 Installation completed successfully!
+
+🔄 Please restart your terminal or run:
+   source /root/.bashrc
+
+🚀 Then you can start using Claude Code with:
+   claude
+
+5. 关闭终端再重新进入，就可以顺利启动 claude 啦：
+claude
+
+# 1.0.72 (Claude Code)
+claude --version
