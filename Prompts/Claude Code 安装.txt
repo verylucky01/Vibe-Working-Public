@@ -1,0 +1,31 @@
+# 查看 Ubuntu 发行版本
+lsb_release -a
+# 或者（适配几乎所有 Linux）
+cat /etc/os-release
+uname -r
+
+sudo apt full-upgrade
+apt --version
+apt-get --version
+dpkg --version
+
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -
+sudo apt-get install -y nodejs
+node --version
+npm --version
+
+npm install -g @anthropic-ai/claude-code --registry=https://registry.npmmirror.com
+npm install -g npm@11.5.2 --registry=https://registry.npmmirror.com
+npm fund
+
+test -f ~/.bash_profile && echo "存在" || echo "不存在"
+echo $SHELL
+touch ~/.bash_profile
+
+echo 'export ANTHROPIC_AUTH_TOKEN="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"' >> ~/.bash_profile
+echo 'export ANTHROPIC_BASE_URL="https://api.anthropic.com"' >> ~/.bash_profile
+source ~/.bash_profile
+
+退出终端后重新进入，输入 claude 就大功告成了。
+
+/model claude-sonnet-4-20250514
