@@ -1,8 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding: UTF-8 -*-
 """
 交互式脚本: 在中英混排时对英文字母、数字、符号与 CJK (中日韩) 字符之间添加空格
-依赖: pangu (https://github.com/vinta/pangu.py / https://pypi.org/project/pangu/)
+依赖: pangu (https://github.com/vinta/pangu.py and https://pypi.org/project/pangu/)
 功能:
   - 使用 pangu.spacing_text 做主处理 (在 CJK 与半角字符之间插入空格)
   - 在 pangu 的基础上做若干细微的正则规范化 (去除 CJK 与全角标点之间多余空格、折叠连续空格等)
@@ -21,14 +19,55 @@ from typing import Optional
 
 # 定义了完整的 CJK 字符 Unicode 范围 (用于正则), 确保全面覆盖。
 _CJK_RANGES = (
-    r"\u4E00-\u9FFF"  # 常用汉字
-    r"\u3400-\u4DBF"  # 扩展 A
-    r"\uF900-\uFAFF"  # 兼容表意文字
-    r"\u3040-\u309F"  # 平假名
-    r"\u30A0-\u30FF"  # 片假名
-    r"\uAC00-\uD7AF"  # 韩文音节
+    "\u3400-\u4dbf"  # CJK Unified Ideographs Extension A
+    "\u4e00-\u9fff"  # CJK Unified Ideographs
+    "\uf900-\ufaff"  # CJK Compatibility Ideographs
+    "\u3040-\u309f"  # Hiragana
+    "\u30a0-\u30ff"  # Katakana
+    "\uac00-\ud7af"  # Hangul Syllables
+    "\U00020000-\U0002a6df"  # CJK Extension B
+    "\U0002a700-\U0002b73f"  # Extension C
+    "\U0002b740-\U0002b81f"  # Extension D
+    "\U0002b820-\U0002ceaf"  # Extension E
+    "\U0002ceb0-\U0002ebef"  # Extension F/G (adjust as needed)
+    "\u2f800-\u2fa1F"  # Compatibility Supplement
 )
 _CJK_CLASS = f"[{_CJK_RANGES}]"
+TRUSTED_HOST = "repo.huaweicloud.com"
+INDEX_URL = "https://repo.huaweicloud.com/repository/pypi/simple/"
+
+_SPACE_NORMALIZATION = str.maketrans(
+    {
+        "\u00a0": " ",
+        "\u2007": " ",
+        "\u202f": " ",
+    }
+)
+
+# Pre-escaped character buckets
+# _FULLWIDTH_PUNCT = re.escape(",，.。!！?？、;；:：·~～—…")
+# _FULLWIDTH_PUNCT = re.escape(",.!?;、:·~～———…")
+_FULLWIDTH_PUNCT = re.escape("，、。？！；：“”‘’—【】〖〗——《》「」（）〔〕〈〉……")
+_HALF_PUNCT = re.escape(",.!?@#$%^&*+={}\\|;:~-…" "''[]<>()")
+# _OPENERS = re.escape("([{（〔【《〈「『〖〘〚“‘'")
+# _CLOSERS = re.escape(")]}）〕】》〉」』〗〙〛”’'")
+_PAIR_OPENERS = re.escape("([{（〔【《〈「『〖〘〚“‘'\"")
+_PAIR_CLOSERS = re.escape(")]}）〕】》〉」』〗〙〛”’'\"")
+
+_CJK_TO_PUNCT = re.compile(
+    rf"({_CJK_CLASS})([ \t]+)([{_FULLWIDTH_PUNCT}{_HALF_PUNCT}])"
+)
+_PUNCT_TO_CJK = re.compile(
+    rf"([{_FULLWIDTH_PUNCT}{_HALF_PUNCT}])([ \t]+)({_CJK_CLASS})"
+)
+_HALF_PUNCT_GAP = re.compile(
+    rf"([{_HALF_PUNCT}])([ \t]+)([{_FULLWIDTH_PUNCT}{_HALF_PUNCT}])"
+)
+_SPACE_BEFORE_CLOSER = re.compile(rf"([ \t]+)([{_PAIR_CLOSERS}])")
+_SPACE_AFTER_OPENER = re.compile(rf"([{_PAIR_OPENERS}])([ \t]+)")
+_MULTI_SPACE = re.compile(r"[ \t]{2,}")
+
+# _CJK_GAP = re.compile(rf"({_CJK_CLASS})([ \t]+)({_CJK_CLASS})")
 
 
 def ensure_pangu_module() -> Optional[object]:
@@ -48,7 +87,18 @@ def ensure_pangu_module() -> Optional[object]:
         print("检测到 pangu 未安装, 尝试通过 pip 自动安装 (需要网络) ...")
         try:
             subprocess.check_call(
-                [sys.executable, "-m", "pip", "install", "-U", "pangu"]
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "-U",
+                    "pangu",
+                    "--index-url",
+                    INDEX_URL,
+                    "--trusted-host",
+                    TRUSTED_HOST,
+                ]
             )
             # 尝试重新 import
             importlib.invalidate_caches()
@@ -63,49 +113,20 @@ def ensure_pangu_module() -> Optional[object]:
 
 
 def normalize_spacing(text: str) -> str:
-    """
-    核心排版逻辑, 在 pangu 处理后进行额外的正则规范化, 目标是 “像素级” / 强迫症级别的视觉整洁:
-      1. 把非断行空格替换为普通空格
-      2. 去掉 CJK 与全角 (中文) 标点之间不必要的空格, 例如 "你好 , " -> "你好, "
-      3. 去掉全角括号/引号内外多余空格, 例如 " (  今天" -> " (今天", "今天 ) " -> "今天) "
-      4. 去掉引号/书名号前后不必要的空格 (尽量保持中文标点与 CJK 紧贴)
-      5. 折叠连续多个空格为单个空格 (除非用户刻意输入多个空格)
-      6. 两端 strip
-    这些规则配合 pangu 可以达到更精细的排版效果。
-    """
-    # 1) 统一空格字符 (将不同种类的空格统一为普通空格)
-    text = text.replace("\u00a0", " ").replace("\u2007", " ").replace("\u202f", " ")
+    if not text:
+        return text
 
-    # 2) 去掉 CJK 与中文标点之间不必要的空格 (常见中文全角标点)
-    #    例如:  "你好 , " 或 "你好 。" -> "你好, " / "你好."
-    #    匹配: CJK_char 任何空白 标点 -> 替换为 CJK_char + 标点
-    text = re.sub(
-        rf"({_CJK_CLASS})\s+([,，.。!！?？、;；:：·~～—…...])",
-        r"\1\2",
-        text,
-    )
+    text = text.translate(_SPACE_NORMALIZATION)
 
-    # 3) 去掉标点前多余空格 (如 半角/全角右括号等) :
-    text = re.sub(r"\s+([) 】》」』\]\)\}])", r"\1", text)
+    text = _SPACE_BEFORE_CLOSER.sub(r"\2", text)
+    text = _SPACE_AFTER_OPENER.sub(r"\1", text)
+    text = _CJK_TO_PUNCT.sub(r"\1\3", text)
+    text = _PUNCT_TO_CJK.sub(r"\1\3", text)
+    text = _HALF_PUNCT_GAP.sub(r"\1\3", text)
+    # text = _CJK_GAP.sub(r"\1\3", text)
+    text = _MULTI_SPACE.sub(" ", text)
 
-    # 4) 去掉标点后多余空格 (如 左括号/左引号后不应有空格)
-    text = re.sub(r"([ (【《「『\[\(\{])\s+", r"\1", text)
-
-    # 5) 对中文引号 (“” ‘’) 的前后空格做微调: 去掉引号与 CJK 之间的空格
-    text = re.sub(
-        rf"({_CJK_CLASS})\s+([“‘])", r"\1\2", text
-    )  # CJK + 空格 + 开引号 -> 紧贴
-    text = re.sub(
-        rf"([”’])\s+({_CJK_CLASS})", r"\1\2", text
-    )  # 关引号 + 空格 + CJK -> 紧贴
-
-    # 6) 折叠多个连续空格 (不影响换行)
-    text = re.sub(r" {2,}", " ", text)
-
-    # 7) 清除行首行尾多余空白
-    text = text.strip()
-
-    return text
+    return text.strip()
 
 
 def format_text_with_pangu(pangu_module: object, raw: str) -> str:
@@ -118,7 +139,7 @@ def format_text_with_pangu(pangu_module: object, raw: str) -> str:
     try:
         spaced = pangu_module.spacing_text(raw)
     except Exception:
-        # 若 pangu 的 API 异常, 为了稳健性退回原始文本并尽量做最基本的清理
+        # 若 pangu 的 API 异常, 为了稳健性退回原始文本并尽量做最基本的清理。
         spaced = raw
 
     # 进一步做细节处理
@@ -136,7 +157,7 @@ def main():
     """
     pangu_module = ensure_pangu_module()
     if pangu_module is None:
-        # 如果无法安装或导入 pangu, 则提示用户并继续, 但排版功能会降级 (不到位)
+        # 如果无法安装或导入 pangu, 则提示用户并继续, 但排版功能会降级 (不到位)。
         print("❌ 警告: pangu 未安装, 脚本无法使用 pangu 的完整功能。")
         print("✅ 请先安装 pangu: pip install -U pangu, 然后重新运行。")
         # 仍然允许用户输入, 但我们只能做有限的正则清理
