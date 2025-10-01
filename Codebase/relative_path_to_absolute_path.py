@@ -6,6 +6,7 @@ from typing import Union
 
 class PathConversionError(Exception):
     """自定义异常类, 用于路径转换过程中发生的特定错误。"""
+
     pass
 
 
@@ -15,18 +16,18 @@ def get_absolute_path(
     """
     根据用户输入的相对路径恢复出绝对路径, 能在 Windows、Linux、macOS 平台都正确执行。
 
-    本函数充分利用 Python 的 pathlib 模块, 特别是其 `Path.resolve(strict=False)` 方法, 
-    以确保即使路径所指的文件或目录不实际存在时, 也能进行可靠的路径转换, 
+    本函数充分利用 Python 的 pathlib 模块, 特别是其 `Path.resolve(strict=False)` 方法,
+    以确保即使路径所指的文件或目录不实际存在时, 也能进行可靠的路径转换,
     返回其理论上的绝对路径形式。
 
     Args:
         relative_path_input (str): 用户输入的相对路径字符串。
                                    函数会处理路径中可能包含的特殊字符、
-                                   操作系统特定的路径分隔符（如 `/` 或 `\`）, 
+                                   操作系统特定的路径分隔符 (如 `/` 或 `\`) ,
                                    以及 `.` 和 `..` 等目录导航符。
-                                   对于 Python 字符串字面量中的转义字符, 
+                                   对于 Python 字符串字面量中的转义字符,
                                    `pathlib` 会将其视为路径字符串的一部分。
-                                   建议在 Python 代码中使用原始字符串（`r"..."`）
+                                   建议在 Python 代码中使用原始字符串 (`r"..."`) 
                                    来表示包含反斜杠的路径, 以避免 Python 自身的
                                    字符串转义规则造成混淆。
         return_path_object (bool): 如果为 `True`, 函数将返回一个 `pathlib.Path` 对象。
@@ -41,11 +42,11 @@ def get_absolute_path(
         PathConversionError: 如果路径字符串虽然是字符串类型, 但其内容在转换为
                              `Path` 对象或在 `resolve()` 过程中遇到非常规的
                              、无法通过 `strict=False` 优雅处理的系统错误。
-                             （例如, 权限问题导致无法确定当前工作目录等极少数情况）。
+                              (例如, 权限问题导致无法确定当前工作目录等极少数情况) 。
     """
     if not isinstance(relative_path_input, str):
         raise TypeError(
-            f"输入路径必须是字符串类型（str）, 但收到了 '{type(relative_path_input).__name__}' 类型。"
+            f"输入路径必须是字符串类型 (str) , 但收到了 '{type(relative_path_input).__name__}' 类型。"
         )
 
     try:
@@ -55,18 +56,18 @@ def get_absolute_path(
         path_obj = Path(relative_path_input)
 
         # 使用 .resolve(strict=False) 方法将路径解析为绝对路径。
-        # resolve() 方法会: 
-        #   1. 将路径转换为绝对路径（如果输入是相对路径, 则相对于当前工作目录）。
+        # resolve() 方法会:
+        #   1. 将路径转换为绝对路径 (如果输入是相对路径, 则相对于当前工作目录) 。
         #   2. 解析路径中的 '.' (当前目录) 和 '..' (父目录) 组件。
         #   3. 解析所有遇到的符号链接 (symlinks), 将其替换为它们指向的实际路径。
         #
-        # strict=False 参数是这里的关键, 它确保: 
+        # strict=False 参数是这里的关键, 它确保:
         #   - 即使路径或其任何组件不存在, 函数也会尽可能地解析路径。
         #   - 它会解析到路径中存在的最后一个组件, 然后将剩余的、不存在的部分
         #     以字符串形式附加到结果中, 而不会引发 FileNotFoundError。
-        #     例如, '/a/b/c/d.txt', 如果 '/a/b' 存在但 '/a/b/c' 不存在, 
+        #     例如, '/a/b/c/d.txt', 如果 '/a/b' 存在但 '/a/b/c' 不存在,
         #     则 resolve(strict=False) 会返回 Path('/a/b/c/d.txt')。
-        #   - 这对于处理用户可能输入的、但尚未在文件系统上创建的文件或目录的路径非常重要, 
+        #   - 这对于处理用户可能输入的、但尚未在文件系统上创建的文件或目录的路径非常重要,
         #     满足了 “保证路径转换的完全有效、可靠” 的要求。
         absolute_path_obj = path_obj.resolve(strict=False)
 
@@ -75,7 +76,7 @@ def get_absolute_path(
 
     except Exception as e:
         # 捕获其他可能的异常, 例如在极少数情况下, pathlib 内部可能因
-        # 操作系统交互问题引发的异常（如权限问题或无法访问 CWD）。
+        # 操作系统交互问题引发的异常 (如权限问题或无法访问 CWD) 。
         # 将其包装为自定义异常, 提供更清晰的错误信息。
         raise PathConversionError(
             f"处理路径 '{relative_path_input}' 时发生意外错误: {e}"
@@ -84,6 +85,14 @@ def get_absolute_path(
 
 def run_tests():
     print("****** 绝对路径恢复功能测试开始 ******")
+
+    test_case1 = "run_paranoid_text_spacing.py"
+    result1 = get_absolute_path(test_case1)
+    print(f"测试用例 1: {test_case1} -> {result1}")
+
+    test_case2 = "..\IDRs\deploy_LightGBM.py"
+    result2 = get_absolute_path(test_case2)
+    print(f"测试用例 2: {test_case2} -> {result2}")
 
     # 获取当前工作目录, 用于验证相对路径的预期结果。
     current_working_directory = Path.cwd()
@@ -103,8 +112,8 @@ def run_tests():
         ("dir/file's.zip", "包含单引号的路径"),
         # 注意: Windows 文件名不允许某些字符如 < > : " / \ | ? *
         # 这里测试的 'file".txt' 在 Linux/macOS 上是合法的, 但在 Windows 上 Path.resolve()
-        # 可能无法处理或在文件系统层面非法。Pathlib 在创建 Path 对象时通常不会报错, 
-        # 但在与 OS 交互时（如 resolve()）可能会遇到问题。
+        # 可能无法处理或在文件系统层面非法。Pathlib 在创建 Path 对象时通常不会报错,
+        # 但在与 OS 交互时 (如 resolve()) 可能会遇到问题。
         # 由于 strict=False, 它会尽量解析, 即使路径包含 OS 不允许的字符。
         ('dir/file".txt', "包含双引号的路径 (Linux/macOS 通常允许, Windows 不允许)"),
         (
@@ -178,7 +187,7 @@ def run_tests():
         print(f"输入相对路径: '{input_path}'")
 
         # 预期结果: 直接使用 Path(input_path).resolve(strict=False)
-        # 因为 resolve() 会自动处理相对路径（相对于 CWD）和绝对路径。
+        # 因为 resolve() 会自动处理相对路径 (相对于 CWD) 和绝对路径。
         expected_path_obj = Path(input_path).resolve(strict=False)
 
         # 1. 测试返回 Path 对象
